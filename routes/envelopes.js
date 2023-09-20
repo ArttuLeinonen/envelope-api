@@ -1,86 +1,97 @@
 const express = require('express')
 const router = express.Router();
-const budget = 1300;
-const envelopes = [{budget}];
+let budgetLeft = 1300;
+let budgetUsed = 0;
+let envelopes = [{title: 'Test', budget: 100, envelopeId: 1}, {title: 'Test2', budget: 200, envelopeId: 2}];
 
+//Calculate value of budget on every request
+router.use((req, res, next) => {
+    budgetUsed = 0;
+    budgetLeft = 1300;
+    envelopes.forEach((element) => budgetUsed += element.budget);
+    budgetLeft -= budgetUsed;
+    console.log(budgetLeft);
+    next();
+})
 
-
+//Get all envelopes
 router.get('/', (req, res) => {
-    res.json({
-        envelopes
-    })
+  
+    res.json(envelopes);
+
 })
 
+//Get specific envelope
 router.get('/:id', (req, res) => {
-    const result = envelopes.find((element) => element.id === req.params.id);
-    if(result) {
-        res.json(result);
+    const found = envelopes.find((element) => JSON.stringify(element.envelopeId) === req.params.id)
+    if(found) {
+        res.status(200).send(found);
     } else {
-        res.status(404).send('Cannot find id');
+        res.status(400).send('error');
     }
 })
 
+//New envelope
+router.post('/', (req, res, next) => {
+    if(req.body) {
+        const envelope = req.body
+        envelope.envelopeId = envelopes.length + 1;
+        if(envelopes.find((element) => element.title === envelope.title)) {
+            res.status(400).send('Envelope with this title already exists.');
+        } else {
+            envelopes.push(envelope);
+            res.status(200).send(envelope);
+        }
+   
+    } else {
+        res.status(400).send('Error');
+    }
+})
+
+//Update envelope
 router.post('/:id', (req, res) => {
-
-    const data = {
-        envelope: req.body
-    }
-
-    if(!data) {
-        res.status(404).send({ message: 'No data received.'});
-    } 
-    data.envelope.id = req.params.id;
-    console.log(data)
-    envelopes.push(data.envelope)
-
-    res.json({
-        data
-    })
-})
-
-router.put('/:id', (req, res) => {
-    const match = (element) => element.id === req.params.id;
-    const index = envelopes.findIndex(match);
-    console.log(index);
-    if(index > -1) {
-        envelopes[index] = req.body;
-        req.body.id = req.params.id;
-        res.status(201).send('Envelope change successful')
-    } else {
-        res.status(404).send('Id not found');
-    }
     
+    let target = envelopes.find((element) => JSON.stringify(element.envelopeId) === req.params.id);
+    if(target) {
+        if(req.body['title'] && req.body['budget']) {
+        target.title = req.body['title'];
+        target.budget = req.body['budget'];
+        target.envelopeId = parseInt(req.params.id);
+        res.status(200).json(target);
+        } else {
+            res.status(400).send('Please enter title and budget');
+        }
+        
+    } else {
+        res.status(400).send('error');
+    }
 })
 
 router.delete('/:id', (req, res) => {
-    const match = (element) => element.id === req.params.id;
-    const index = envelopes.findIndex(match);
-    console.log(index)
-    if(index > -1) {
-        envelopes.splice(index, 1);
-        res.status(200).send('Deleted element');
+    const filteredArr = envelopes.filter((element) => JSON.stringify(element.envelopeId) !== req.params.id)
+   console.log(filteredArr)
+    if(filteredArr) {
+        envelopes = filteredArr;
+        res.status(201).send('Element removed');
     } else {
-        res.status(404).send('Cannot find id');
+        res.status(401).send('Error');
     }
 })
 
 router.post('/transfer/:from/:to', (req, res) => {
-    const transferFrom = req.params.from;
-    const transferTo = req.params.to;
-    const transferFromMatch = (element) => element.id === req.params.from;
-    const transferFromIndex = envelopes.findIndex(transferFromMatch);
-    const transferToMatch = (element) => element.id === req.params.to;
-    const transferToIndex = envelopes.findIndex(transferToMatch);
+    const transferFrom = envelopes.find((element) => JSON.stringify(element.envelopeId) === req.params.from);
+    const transferTo = envelopes.find((element) => JSON.stringify(element.envelopeId) === req.params.to);
     if(transferFrom && transferTo) {
-        console.log(envelopes[transferFromIndex]['food']);
-        console.log(envelopes[transferToIndex]['rent']);
-        const value = req.body
-        envelopes[transferFromIndex]['food'] - value;
-        envelopes[transferToIndex]['rent'] + value;
-        res.status(200).json(`Success`);
-    } else {
-        res.status(400).send('Could not find id');
-    }
-})
+        const value = req.header('transfer_value');
+        if(value) {
+            transferFrom.budget -= parseInt(value);
+            transferTo.budget += parseInt(value);
+            return res.status(200).json({value: value})
+        }
 
+    }
+    res.status(400).send(JSON.stringify(req.headers));
+    
+    
+})
 module.exports = router
