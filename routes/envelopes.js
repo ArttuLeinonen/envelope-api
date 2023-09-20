@@ -16,9 +16,7 @@ router.use((req, res, next) => {
 
 //Get all envelopes
 router.get('/', (req, res) => {
-  
     res.json(envelopes);
-
 })
 
 //Get specific envelope
@@ -34,8 +32,11 @@ router.get('/:id', (req, res) => {
 //New envelope
 router.post('/', (req, res, next) => {
     if(req.body) {
-        const envelope = req.body
+        const envelope = {};
+        envelope.title = req.body.title;
+        envelope.budget = parseInt(req.body.budget);
         envelope.envelopeId = envelopes.length + 1;
+
         if(envelopes.find((element) => element.title === envelope.title)) {
             res.status(400).send('Envelope with this title already exists.');
         } else {
